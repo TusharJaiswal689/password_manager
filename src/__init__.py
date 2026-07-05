@@ -19,7 +19,6 @@ try:
 
         # 2. Setup the Vault
         vault = CryptoVault()
-        my_salt = secrets.token_bytes(16)
         my_iv = secrets.token_bytes(12)
 
         # 3. Unlock vault and Encrypt
