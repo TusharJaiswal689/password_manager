@@ -1,4 +1,3 @@
-import asyncio
 import secrets
 import tkinter as tk
 from tkinter import simpledialog
@@ -8,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from crypto import CryptoVault , generate_secure_password
 from db import DatabaseManager
 from clipboard import copy_and_secure_clear
+from schema import CreatePasswordSchema, GetPasswordSchema
 
 mcp =FastMCP("Local Password Manager")
 db = DatabaseManager()
@@ -41,30 +41,31 @@ async def ensure_vault_unlocked():
         vault.derive_key(master, master_salt)
     
 @mcp.tool()
-async def create_new_password(website:str, username:str, length: int=16, symbols: int=2, digits: int=4) -> str:
+async def create_new_password(params: CreatePasswordSchema) -> str:
     await ensure_vault_unlocked()
-    raw_password=generate_secure_password(length, symbols, digits)
+    raw_password=generate_secure_password(params.length, params.symbols, params.digits)
     my_iv = secrets.token_bytes(12)
     ciphertext = vault.encrypt(raw_password, my_iv)
 
     await db.save_credential(
-        website=website,
-        username=username,
+        website=params.website,
+        username=params.username,
         ciphertext=ciphertext,
         iv=my_iv
     ) 
-    return f"Successfully generated, encrypted, and saved a new password for {website} ({username})."
+    return f"Successfully generated, encrypted, and saved a new password for {params.website} ({params.username})."
 
 @mcp.tool()
-async def get_password(website:str, username:str) -> str:
+async def get_password(params: GetPasswordSchema) -> str:
     await ensure_vault_unlocked()
-    ciphertext, iv = await db.get_credential(website, username)
+    ciphertext, iv = await db.get_credential(params.website, params.username)
     if not ciphertext:
         return "No password found for given account"
     else:
         plaintext = vault.decrypt(ciphertext, iv)
-        copy_and_secure_clear(plaintext)
-        
+        await copy_and_secure_clear(plaintext)
+        return "Successfully found the password and copied it to the clipboard. Do not ask me what it is."
+
 if __name__ == "__main__":
 
     mcp.run(transport='stdio')

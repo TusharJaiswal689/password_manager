@@ -1,0 +1,13 @@
+# MCP Server Framework
+mcp
+
+# Data Validation
+pydantic
+
+# Database and Environment
+asyncpg
+python-dotenv
+
+# Cryptography and Utilities
+cryptography
+pyperclip
