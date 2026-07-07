@@ -1,6 +1,6 @@
 import secrets
 import tkinter as tk
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 
 from mcp.server.fastmcp import FastMCP
 
@@ -17,16 +17,28 @@ def prompt_for_master_password() -> str:
     root = tk.Tk()
     root.withdraw() # Hides the main background window
     
-    # Prompt the user
-    master = simpledialog.askstring("Vault Lock", "Enter Master Password:", show="*")
-    root.destroy() # Cleans up tkinter completely
-    
-    if master:
+    # Loop so they can try again if they fail the strength check
+    while True: 
+        # Prompt the user
+        master = simpledialog.askstring("Vault Lock", "Enter Master Password (Min 12 chars):", show="*")
+        
+        # 1. Did they hit cancel?
+        if master is None:
+            root.destroy() # Cleans up tkinter completely
+            raise ValueError("Authentication cancelled by user.")
+            
+        # 2. Is the password too weak?
+        if len(master) < 12:
+            # Pop up a native OS error message!
+            messagebox.showerror(
+                "Weak Password", 
+                "Your Master Password is the only thing protecting your vault.\n\nIt must be at least 12 characters long. Please try again."
+            )
+            continue # This pushes them back to the start of the while loop
+            
+        # 3. If it passes all checks, return it
+        root.destroy() 
         return master
-    else:
-        # Stop the program if they hit cancel, don't return a fake password!
-        raise ValueError("Authentication cancelled by user.")
-
 
 async def ensure_vault_unlocked():
     # 1. Ensure database is connected on the correct event loop
@@ -37,7 +49,7 @@ async def ensure_vault_unlocked():
     # 2. Unlock vault if needed
     if vault.key == None:
         master = prompt_for_master_password()
-        master_salt = await db.get_or_create_salt()
+        master_salt = await db.authenticate_or_setup(master)
         vault.derive_key(master, master_salt)
     
 @mcp.tool()

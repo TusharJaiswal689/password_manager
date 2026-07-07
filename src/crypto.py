@@ -3,16 +3,31 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import secrets
 import string
+import hashlib
 
-def generate_secure_password(length: int, num_symbols: int, num_digits: int) -> str:
-    """Generates a random password string."""
-    letters = [secrets.choice(string.ascii_letters) for _ in range(length)]
+def generate_secure_password(total_length: int, num_symbols: int, num_digits: int) -> str:
+    """Generates a random password string with an exact total length."""
+    if num_symbols + num_digits > total_length:
+        raise ValueError("The number of symbols and digits cannot exceed the total password length.")
+        
+    num_letters = total_length - num_symbols - num_digits
+    
+    letters = [secrets.choice(string.ascii_letters) for _ in range(num_letters-num_digits+num_symbols)]
     symbols = [secrets.choice("!@#$%^&*()_+=-[]{}|;:,.<>?") for _ in range(num_symbols)]
     digits = [secrets.choice(string.digits) for _ in range(num_digits)]
     
     password_list = letters + digits + symbols
     secrets.SystemRandom().shuffle(password_list)
     return "".join(password_list)
+
+def generate_auth_hash(master_password: str, auth_salt: bytes) -> bytes:
+    """Generates a verification hash to validate the master password before decryption."""
+    return hashlib.pbkdf2_hmac(
+        'sha256',
+        master_password.encode('utf-8'),
+        auth_salt,
+        100_000 # Separate iteration count just for authentication
+    )
 
 class CryptoVault:
     def __init__(self):
@@ -45,4 +60,3 @@ class CryptoVault:
         cipher = AESGCM(self.key)
         decrypted_bytes = cipher.decrypt(iv, ciphertext, None)
         return decrypted_bytes.decode('utf-8')
-     
